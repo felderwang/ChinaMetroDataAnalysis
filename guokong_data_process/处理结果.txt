@@ -1,0 +1,211 @@
+2014-2020删除的点：
+3195A，2020年新加
+3187A, 2019年中新加
+CO: 3195A, 3187A, 3207A, 3190A, 3173A, 3164A, 3191A, 3237A, 
+NO2:2872A, 2996A, 
+O3: 1230A, 2907A, 2343A, 3173A, 2994A, 1263A, 2870A, 2921A, 1227A
+PM10:      1150A, 1809A, 3046A, 1274A, 1279A, 2358A, 2873A, 2318A, 1800A, 1146A, 1278A, 1141A, 2875A, 1148A, 1276A, 1272A, 1162A, 1801A, 
+
+[3195A, 3187A, 3207A, 3190A, 3173A, 3164A, 3191A, 3237A, 2872A, 2996A, 1230A, 2907A, 2343A, 3173A, 2994A, 1263A, 2870A, 2921A, 1227A, 1150A, 1809A, 3046A, 1274A, 1279A, 2358A, 2873A, 2318A, 1800A, 1146A, 1278A, 1141A, 2875A, 1148A, 1276A, 1272A, 1162A, 1801A]
+
+list 2014-2020长三角
+['1292A', '1203A', '2280A', '2290A', '2997A', '1997A', '1295A', '2315A', '1169A', '1808A', '1226A', '1291A', '2275A', '2298A', '1154A', '2284A', '2271A', '2296A', '1229A', '1170A', '2316A', '2289A', '2007A', '1270A', '1262A', '1159A', '1204A', '2382A', '2285A', '1257A', '1241A', '1797A', '1252A', '1804A', '2342A', '1166A', '1271A', '2360A', '1290A', '1205A', '2312A', '1796A', '1210A', '2299A', '2288A', '2286A', '2314A', '2281A', '1265A', '1242A', '3002A', '1246A', '1167A', '2287A', '2423A', '2282A', '1221A', '2006A', '1171A', '2346A', '2294A', '1799A', '2311A', '3003A', '2001A', '2273A', '2301A', '2383A', '1256A', '2344A', '1145A', '1803A', '1266A', '1147A', '1795A', '2308A', '2357A', '1144A', '1233A', '2000A', '1186A', '2345A', '1294A', '1806A', '1234A', '1298A', '1999A', '2309A', '2278A', '1213A', '2283A', '1264A', '1200A', '1153A', '1240A', '2279A', '2274A', '2306A', '2291A', '1223A', '1239A', '2317A', '2005A', '1212A', '1798A', '1165A', '1215A', '1218A', '2376A', '2379A', '1269A', '1142A', '1228A', '1155A', '2361A', '1149A', '2303A', '2277A', '2310A', '2297A', '2292A', '3004A', '2307A', '1192A', '1267A', '1253A', '2270A', '1196A', '2295A', '1160A', '1235A', '1268A', '1245A', '1794A', '1236A', '1211A', '2004A', '1255A', '1296A', '1232A']
+
+stat_df里面的nc统计量，是整个网格里的统计量。而为每个站点分配时，没有分配到站点的数据就没了，因此最后分配后的统计量跟开始的时候不一样。而在后面生成uv_speed, uv_dir时候，使用的是分配后的统计量。因此会出现uv_speed max < max(u, v)
+
+netcdf 
+['cc', 'crwc', 'q', 't', 'u', 'v']
+cc : Fraction of cloud cover
+crwc: Specific rain water content
+q : Specific humidity(specific_humidity)
+t : Temperature(air_temperature)
+u : U component of wind(eastward_wind)
+v : V component of wind(northward_wind)
+longitude
+<class 'netCDF4._netCDF4.Variable'>
+float32 longitude(longitude)
+    units: degrees_east
+    long_name: longitude
+unlimited dimensions: 
+current shape = (29,)
+filling on, default _FillValue of 9.969209968386869e+36 used
+****max:122.0, min:115.0, mean:118.5, std:2.0916500091552734****
+latitude
+<class 'netCDF4._netCDF4.Variable'>
+float32 latitude(latitude)
+    units: degrees_north
+    long_name: latitude
+unlimited dimensions: 
+current shape = (25,)
+filling on, default _FillValue of 9.969209968386869e+36 used
+****max:34.0, min:28.0, mean:31.0, std:1.8027756214141846****
+level
+<class 'netCDF4._netCDF4.Variable'>
+int32 level(level)
+    units: millibars
+    long_name: pressure_level
+unlimited dimensions: 
+current shape = (6,)
+filling on, default _FillValue of -2147483647 used
+****max:1000, min:875, mean:937.5, std:42.69562819149833****
+time
+<class 'netCDF4._netCDF4.Variable'>
+int32 time(time)
+    units: hours since 1900-01-01 00:00:00.0
+    long_name: time
+    calendar: gregorian
+unlimited dimensions: 
+current shape = (1464,)
+filling on, default _FillValue of -2147483647 used
+****max:1025610, min:1016832, mean:1021221.0, std:2535.72179073336****
+cc
+<class 'netCDF4._netCDF4.Variable'>
+int16 cc(time, level, latitude, longitude)
+    scale_factor: 1.525948758640685e-05
+    add_offset: 0.4999923702562068
+    _FillValue: -32767
+    missing_value: -32767
+    units: (0 - 1)
+    long_name: Fraction of cloud cover
+unlimited dimensions: 
+current shape = (1464, 6, 25, 29)
+filling on
+****max:1.0, min:0.0, mean:0.08978821166351365, std:0.2388287407548569****
+z
+<class 'netCDF4._netCDF4.Variable'>
+int16 z(time, level, latitude, longitude)
+    scale_factor: 0.2165053651404636
+    add_offset: 6510.10073169243
+    _FillValue: -32767
+    missing_value: -32767
+    units: m**2 s**-2
+    long_name: Geopotential
+    standard_name: geopotential
+unlimited dimensions: 
+current shape = (1464, 6, 25, 29)
+filling on
+****max:13604.33203125, min:-583.9140625, mean:6737.8892165165635, std:3826.473947737899****
+o3
+<class 'netCDF4._netCDF4.Variable'>
+int16 o3(time, level, latitude, longitude)
+    scale_factor: 1.9028627862194075e-12
+    add_offset: 1.0537549924503787e-07
+    _FillValue: -32767
+    missing_value: -32767
+    units: kg kg**-1
+    long_name: Ozone mass mixing ratio
+    standard_name: mass_fraction_of_ozone_in_air
+unlimited dimensions: 
+current shape = (1464, 6, 25, 29)
+filling on
+****max:1.677266041610892e-07, min:4.302629719177277e-08, mean:7.477852532840188e-08, std:1.1971315250504185e-08****
+r
+<class 'netCDF4._netCDF4.Variable'>
+int16 r(time, level, latitude, longitude)
+    scale_factor: 0.0017136047322766864
+    add_offset: 52.17737920532429
+    _FillValue: -32767
+    missing_value: -32767
+    units: %
+    long_name: Relative humidity
+    standard_name: relative_humidity
+unlimited dimensions: 
+current shape = (1464, 6, 25, 29)
+filling on
+****max:108.32706546783447, min:-3.9705934524536133, mean:70.76708185637047, std:22.070429034871445****
+clwc
+<class 'netCDF4._netCDF4.Variable'>
+int16 clwc(time, level, latitude, longitude)
+    scale_factor: 1.8183450450148923e-08
+    add_offset: 0.0005957989374495796
+    _FillValue: -32767
+    missing_value: -32767
+    units: kg kg**-1
+    long_name: Specific cloud liquid water content
+unlimited dimensions: 
+current shape = (1464, 6, 25, 29)
+filling on
+****max:0.0011916160583496094, min:0.0, mean:1.937387879317691e-05, std:6.69971006409642e-05****
+q
+<class 'netCDF4._netCDF4.Variable'>
+int16 q(time, level, latitude, longitude)
+    scale_factor: 4.023820155839967e-07
+    add_offset: 0.013254092537088154
+    _FillValue: -32767
+    missing_value: -32767
+    units: kg kg**-1
+    long_name: Specific humidity
+    standard_name: specific_humidity
+unlimited dimensions: 
+current shape = (1464, 6, 25, 29)
+filling on
+****max:0.026438944041728973, min:6.964341446291829e-05, mean:0.009047995391656991, std:0.005434804101526379****
+crwc
+<class 'netCDF4._netCDF4.Variable'>
+int16 crwc(time, level, latitude, longitude)
+    scale_factor: 2.2581968176085308e-08
+    add_offset: 0.0007399207692576112
+    _FillValue: -32767
+    missing_value: -32767
+    units: kg kg**-1
+    long_name: Specific rain water content
+unlimited dimensions: 
+current shape = (1464, 6, 25, 29)
+filling on
+****max:0.0014798641204833984, min:0.0, mean:6.254617718157077e-06, std:3.0145558593448244e-05****
+t
+<class 'netCDF4._netCDF4.Variable'>
+int16 t(time, level, latitude, longitude)
+    scale_factor: 0.0009481335083564769
+    add_offset: 280.5189351129333
+    _FillValue: -32767
+    missing_value: -32767
+    units: K
+    long_name: Temperature
+    standard_name: air_temperature
+unlimited dimensions: 
+current shape = (1464, 6, 25, 29)
+filling on
+****max:311.58642578125, min:249.452392578125, mean:287.57967788968534, std:9.451766768528719****
+u
+<class 'netCDF4._netCDF4.Variable'>
+int16 u(time, level, latitude, longitude)
+    scale_factor: 0.0008077702517839295
+    add_offset: -1.547889236688392
+    _FillValue: -32767
+    missing_value: -32767
+    units: m s**-1
+    long_name: U component of wind
+    standard_name: eastward_wind
+unlimited dimensions: 
+current shape = (1464, 6, 25, 29)
+filling on
+****max:24.92031860351563, min:-28.015289306640625, mean:-0.821324731188608, std:4.74205633685879****
+v
+<class 'netCDF4._netCDF4.Variable'>
+int16 v(time, level, latitude, longitude)
+    scale_factor: 0.000830994774638827
+    add_offset: 1.5793269342533056
+    _FillValue: -32767
+    missing_value: -32767
+    units: m s**-1
+    long_name: V component of wind
+    standard_name: northward_wind
+unlimited dimensions: 
+current shape = (1464, 6, 25, 29)
+filling on
+****max:28.80853271484375, min:-25.6490478515625, mean:0.05377609669995849, std:4.934997785766477****
+w
+<class 'netCDF4._netCDF4.Variable'>
+int16 w(time, level, latitude, longitude)
+    scale_factor: 0.00016801725049400357
+    add_offset: -2.6622138876230497
+    _FillValue: -32767
+    missing_value: -32767
+    units: Pa s**-1
+    long_name: Vertical velocity
+    standard_name: lagrangian_tendency_of_air_pressure
+unlimited dimensions: 
+current shape = (1464, 6, 25, 29)
+filling on
+****max:2.8432073593139653, min:-8.16746711730957, mean:0.008957510024422653, std:0.1840015405805028****

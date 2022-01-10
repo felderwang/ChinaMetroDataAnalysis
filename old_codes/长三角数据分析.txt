@@ -1,0 +1,94 @@
+/mnt/d/codes/downloads/datasets/国控站点/h5/guokong2020长三角.h5
+             Total     Percent
+count   343.000000  343.000000
+mean   2558.606414    0.292546
+std    3807.373438    0.435327
+min       0.000000    0.000000
+25%      62.500000    0.007146
+50%     136.000000    0.015550
+75%    8746.000000    1.000000
+max    8746.000000    1.000000
+
+key:/AQI, missing_percent:0.1, total_num:343, num:110, per:0.3207
+key:/CO, missing_percent:0.1, total_num:343, num:109, per:0.3178
+key:/CO_24h, missing_percent:0.1, total_num:343, num:105, per:0.3061
+key:/NO2, missing_percent:0.1, total_num:343, num:110, per:0.3207
+key:/NO2_24h, missing_percent:0.1, total_num:343, num:106, per:0.3090
+key:/O3, missing_percent:0.1, total_num:343, num:110, per:0.3207
+key:/O3_24h, missing_percent:0.1, total_num:343, num:106, per:0.3090
+key:/O3_8h, missing_percent:0.1, total_num:343, num:108, per:0.3149
+key:/O3_8h_24h, missing_percent:0.1, total_num:343, num:108, per:0.3149
+key:/PM10, missing_percent:0.1, total_num:343, num:108, per:0.3149
+key:/PM10_24h, missing_percent:0.1, total_num:343, num:105, per:0.3061
+key:/PM2.5, missing_percent:0.1, total_num:343, num:109, per:0.3178
+key:/PM2.5_24h, missing_percent:0.1, total_num:343, num:105, per:0.3061
+key:/SO2, missing_percent:0.1, total_num:343, num:108, per:0.3149
+key:/SO2_24h, missing_percent:0.1, total_num:343, num:105, per:0.3061
+
+key:/AQI, missing_percent:0.2, total_num:343, num:103, per:0.3003
+key:/CO, missing_percent:0.2, total_num:343, num:103, per:0.3003
+key:/CO_24h, missing_percent:0.2, total_num:343, num:103, per:0.3003
+key:/NO2, missing_percent:0.2, total_num:343, num:104, per:0.3032
+key:/NO2_24h, missing_percent:0.2, total_num:343, num:104, per:0.3032
+key:/O3, missing_percent:0.2, total_num:343, num:103, per:0.3003
+key:/O3_24h, missing_percent:0.2, total_num:343, num:103, per:0.3003
+key:/O3_8h, missing_percent:0.2, total_num:343, num:103, per:0.3003
+key:/O3_8h_24h, missing_percent:0.2, total_num:343, num:103, per:0.3003
+key:/PM10, missing_percent:0.2, total_num:343, num:103, per:0.3003
+key:/PM10_24h, missing_percent:0.2, total_num:343, num:103, per:0.3003
+key:/PM2.5, missing_percent:0.2, total_num:343, num:103, per:0.3003
+key:/PM2.5_24h, missing_percent:0.2, total_num:343, num:103, per:0.3003
+key:/SO2, missing_percent:0.2, total_num:343, num:103, per:0.3003
+key:/SO2_24h, missing_percent:0.2, total_num:343, num:103, per:0.3003
+
+key:/AQI, missing_percent:0.05, total_num:343, num:157, per:0.4577
+key:/CO, missing_percent:0.05, total_num:343, num:127, per:0.3703
+key:/CO_24h, missing_percent:0.05, total_num:343, num:120, per:0.3499
+key:/NO2, missing_percent:0.05, total_num:343, num:128, per:0.3732
+key:/NO2_24h, missing_percent:0.05, total_num:343, num:120, per:0.3499
+key:/O3, missing_percent:0.05, total_num:343, num:133, per:0.3878
+key:/O3_24h, missing_percent:0.05, total_num:343, num:120, per:0.3499
+key:/O3_8h, missing_percent:0.05, total_num:343, num:123, per:0.3586
+key:/O3_8h_24h, missing_percent:0.05, total_num:343, num:121, per:0.3528
+key:/PM10, missing_percent:0.05, total_num:343, num:128, per:0.3732
+key:/PM10_24h, missing_percent:0.05, total_num:343, num:121, per:0.3528
+key:/PM2.5, missing_percent:0.05, total_num:343, num:134, per:0.3907
+key:/PM2.5_24h, missing_percent:0.05, total_num:343, num:120, per:0.3499
+key:/SO2, missing_percent:0.05, total_num:343, num:123, per:0.3586
+key:/SO2_24h, missing_percent:0.05, total_num:343, num:119, per:0.3469
+
+mp=0.1
+/AQI 110
+/CO 109
+/CO_24h 105
+/NO2 110
+/NO2_24h 106
+/O3 110
+/O3_24h 106
+/O3_8h 108
+/O3_8h_24h 108
+/PM10 108
+/PM10_24h 105
+/PM2.5 109
+/PM2.5_24h 105
+/SO2 108
+/SO2_24h 105
+no_site 114
+
+mp=0.05
+/AQI 157
+/CO 127
+/CO_24h 120
+/NO2 128
+/NO2_24h 120
+/O3 133
+/O3_24h 120
+/O3_8h 123
+/O3_8h_24h 121
+/PM10 128
+/PM10_24h 121
+/PM2.5 134
+/PM2.5_24h 120
+/SO2 123
+/SO2_24h 119
+no_site 166

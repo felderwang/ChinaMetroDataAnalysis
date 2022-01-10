@@ -1,0 +1,14 @@
+pics/
+**/pics
+**/*.png
+
+datas/
+**/*.xlsx
+**/.pkl
+
+**/*.log
+logs/
+
+prac/
+model/
+.vscode/
