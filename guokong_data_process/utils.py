@@ -65,7 +65,9 @@ def get_season_df(total_df, season_name, year, season_dic=None):
     # season_list = ['summer', 'winter']
     if season_dic is None:
         season_dic = {
+            'spring':[[0, 3], [0, 4], [0, 5]],
             'summer':[[0, 6], [0, 7], [0, 8]],
+            'autumn':[[0, 9], [0, 10], [0, 11]],
             'winter':[[0, 12], [1, 1], [1, 2]],
         }
     season_month_list = season_dic[season_name]
@@ -80,7 +82,9 @@ def get_season_df(total_df, season_name, year, season_dic=None):
 
 def get_season_df_per_month_generator(total_df, season_name, year, new_freq='2h'):
     season_dic = {
+        'spring':[[0, 3], [0, 4], [0, 5]],
         'summer':[[0, 6], [0, 7], [0, 8]],
+        'autumn':[[0, 9], [0, 10], [0, 11]],
         'winter':[[0, 12], [1, 1], [1, 2]],
     }
     season_month_list = season_dic[season_name]

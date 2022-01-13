@@ -12,3 +12,4 @@ logs/
 prac/
 model/
 .vscode/
+**/__pycache__

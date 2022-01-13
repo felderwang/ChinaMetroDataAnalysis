@@ -7,6 +7,8 @@ import pandas as pd
 import graphviz
 import networkx as nx 
 from cdt.causality.graph import LiNGAM, PC, GES
+from cdt.causality.pairwise import ANM
+
 import utils
 import os
 import SyPI
@@ -44,27 +46,56 @@ def str_to_dot(string):
     graph = graph[:9] + graph[10:-2] + graph[-1] # Removing unnecessary characters from string
     return graph
 
-def causal_discovery(df, labels, save_dir, save_name):
-    graphs = {}
+def causal_discovery(df, labels, save_dir, save_name, function_names=['LiNGAM']):
+    total_functions = {
+            'LiNGAM' : LiNGAM,
+            'PC' : PC,
+            'GES' : GES,
+        }
+    functions = {}
+    for function_name in function_names:
+        functions[function_name] = total_functions[function_name]
     # functions = {
-        #     'LiNGAM' : LiNGAM,
-        #     'PC' : PC,
-        #     'GES' : GES,
-        # }
-    functions = {
-        'LiNGAM' : LiNGAM,
-    }
+        # 'LiNGAM' : LiNGAM,
+    # }
     for method, lib in functions.items():
         obj = lib()
         output = obj.predict(df)
         adj_matrix = nx.to_numpy_matrix(output)
         adj_matrix = np.asarray(adj_matrix)
         graph_dot = make_graph(adj_matrix, labels)
-        graphs[method] = graph_dot
+        local_save_name = save_name.split('.dot')[0]+f'_{method}.dot'
+        local_save_path = save_dir + local_save_name
+        print(f'Method: {method}, save to:{local_save_path}')
+
+        graph_dot.render(format='png', filename=local_save_path)
     
-    for method, graph in graphs.items():
-        print(f'Method: {method}, save to:{save_dir+save_name}')
-        filename = graph.render(format='png', filename=save_dir+save_name)
+        # filename = graph.render(format='png', filename=save_dir+save_name)
+
+def pairwise_causal_discovery(df, labels, save_dir, save_name, print_save_flag=True):
+    save_path = save_dir + save_name
+
+    obj = ANM()
+    try:
+        causal_out = obj.predict(df)
+        causal_out_dic = dict(zip(labels, causal_out))
+    except:
+        print(f'pairwise causal ERROR! labels:{labels}')
+        causal_out_dic = {}
+    if print_save_flag:
+        print(f'save to:{save_path}')
+    if os.path.exists(save_path):
+        with open(save_path, 'r+') as fp:
+            file_data = json.load(fp)
+            file_data.update(causal_out_dic)
+            fp.seek(0)
+            json.dump(file_data, fp, indent=4)
+        fp.close()
+    else:        
+        with open(save_path, 'w') as fp:
+            json.dump(causal_out_dic, fp, indent=4)
+        fp.close()
+
 
 def discover_with_cdt_dayaverage(hdf_dir, hdf_name, site_list, year_list, save_dir, stat_name='stat'):
     hdf_path = hdf_dir + hdf_name
@@ -103,7 +134,7 @@ def discover_with_cdt_dayaverage(hdf_dir, hdf_name, site_list, year_list, save_d
         save_name = f'{site}_{year_list[0]}_{year_list[-1]}.dot'
         causal_discovery(site_df, labels, save_dir, save_name)
 
-def discover_with_cdt_perhour(hdf_dir, hdf_name, site_list, year_list, save_dir, stat_name='stat'):
+def discover_with_cdt_perhour(hdf_dir, hdf_name, site_list, year_list, save_dir, function_names, freq='h', stat_name='stat'):
     hdf_path = hdf_dir + hdf_name
     store = pd.HDFStore(hdf_path)
     keys = store.keys()
@@ -143,70 +174,99 @@ def discover_with_cdt_perhour(hdf_dir, hdf_name, site_list, year_list, save_dir,
             save_name = f'{site}_single{year}.dot'
             causal_discovery(site_df, labels, year_save_dir, save_name)
 
-def discover_with_cdt_perhour_summer_and_winter(hdf_dir, hdf_name, pollutant_list, metro_list, site_list, year_list, save_dir, stat_name='stat'):
+def discover_graph_causal(hdf_dir, hdf_name, save_dir, pollutant_list, metro_list, site_list, year_list, function_names, freq='d', stat_name='stat', season_list=['spring', 'summer', 'autumn', 'winter'], lags=None, target_lag_name=None):
     # pd.set_option('display.max_columns', 20)
+    '''
+    lags is a dictionary
+    lag_state:
+        'single': only have cat shift 0 and shift lag_num,
+        'continuous': have cat shift 0 to lag_num, total lag_num+1 columns,
+        'no_need':no need for lag
+    lags = {
+        'PM2.5':[lag_state, lag_num]
+        ...
+    }
+
+    target_lag_name is a cat. For example, if target_lag_name=='O3', then set lags['O3'] lag_state to 'no_need'
+    '''
+    print(f'freq:{freq}')
     EPSILON = 1e-8
     hdf_path = hdf_dir + hdf_name
     store = pd.HDFStore(hdf_path)
-    season_list = ['spring', 'summer', 'autumn', 'winter']
-    season_dic = {
-        'spring':[[0, 3], [0, 4], [0, 5]],
-        'summer':[[0, 6], [0, 7], [0, 8]],
-        'autumn':[[0, 9], [0, 10], [0, 11]],
-        'winter':[[0, 12], [1, 1], [1, 2]],
-    }
-    keys = store.keys()
     df_dic = {}
-    # new_keys = []
-    # for key in keys:
-    #     if 'diff' in key or 'stat' in key:
-    #         continue
-    #     else:
-    #         new_keys.append(key)
-    # keys = new_keys
-    # print(f'keys:{keys}')
-    keys = pollutant_list + metro_list
+    cat_keys = pollutant_list + metro_list
+    print(f'cat_keys:{cat_keys}')
     stat_df = store.get(stat_name)
     print(f'stat_df:\n{stat_df}')
-    for key in keys:
-        df = store.get(key)
-        df.loc[:, site_list] = utils.restrain_df_by_stat(df[site_list], stat_df, key, metro_list)
-        df_dic[key] = df
-    
-    for df_key, item in df_dic.items():
-        print(f'df_key:{df_key}\n{item}')
-    
-    for year in year_list:
-        year_save_dir = save_dir + f'day_season_uv/{year}/'
+    for cat_key in cat_keys:
+        cat_df = store.get(cat_key)
+        cat_df.loc[:, site_list] = utils.restrain_df_by_stat(cat_df[site_list], stat_df, cat_key, metro_list)
+
+        if freq == 'd' or freq == 'D':
+            cat_df = utils.average_df_by_month(cat_df)
+        df_dic[cat_key] = cat_df
+    store.close()
+
+    # for df_key, item in df_dic.items():
+        # print(f'df_key:{df_key}\n{item}')
+    lag_save_dir = ''
+
+    if lags is not None:
+        lag_save_dir = 'lag'
+        if target_lag_name is not None:
+            target_lag = lags[target_lag_name]
+            target_lag[0] = 'no_need'
+            lags[target_lag_name] = target_lag
+        max_lag = 0
+        for _, cat_lag in lags.items():
+            lag_save_dir += str(cat_lag[1])
+            max_lag = max(max_lag, cat_lag[1])
+        lag_save_dir += '/'
+    for year in tqdm(year_list):
+        year_save_dir = save_dir + lag_save_dir + f'season_uv/{year}/'
+        print(f'year_save_dir:{year_save_dir}')
         if not os.path.exists(year_save_dir):
             os.makedirs(year_save_dir)
         print(f'year:{year}')
-        for site in site_list:
-            print(f'site:{site}')
-            for season_idx in range(len(season_list)):
-                #0: summer, 1:winter
-                #0: spring, 1:summer, 2:autumn, 3:winter
+        for site in tqdm(site_list):
+            for season in season_list:
                 site_df = pd.DataFrame()
-                for key in keys:
-                    df = df_dic[key]
-                    ret_df = pd.DataFrame()
-                    for season_month_idx in range(len(season_dic[season_list[season_idx]])):
-                        season_month_list = season_dic[season_list[season_idx]][season_month_idx]
-                        temp_ret_df = df.loc[df['datetime'].dt.year==(year+season_month_list[0])]
-                        temp_ret_df = temp_ret_df.loc[temp_ret_df['datetime'].dt.month==season_month_list[1]]
-                        temp_ret_df = temp_ret_df[[site]]
-                        ret_df = pd.concat([ret_df, temp_ret_df], axis=0)
-                    # ret_df = utils.restrain_df_by_stat(ret_df, stat_df, key)
-                    site_df[key] = ret_df.values[:,0]
-                site_df[site_df<EPSILON] = 0.0
-                # print(site_df)
-                labels = [f'{col}' for col in site_df.columns]
+                for cat_key in cat_keys:
+                    cat_df = df_dic[cat_key]
+                    ret_df = utils.get_season_df(cat_df, season, year)
+                    if lags is None:
+                        site_df[cat_key] = ret_df[site].values
+                    else:
+                        cat_lag = lags[cat_key]
+                        single_site_df = ret_df[site].values
+                        s0_df = single_site_df[max_lag:]
+                        s0_name = cat_key + 's0'
+                        site_df[s0_name] = s0_df
 
-                save_name = f'{site}_single{year}_{season_list[season_idx]}.dot'
-                try:
-                    causal_discovery(site_df, labels, year_save_dir, save_name)
-                except:
-                    print("R ERROR!")
+                        lag_num = cat_lag[1]
+                        if cat_lag[0] == 'no_need':
+                            pass
+                        elif cat_lag[0] == 'single':
+                            if lag_num != 0:
+                                slag_name = cat_key + f's{lag_num}'
+                                slag_df = single_site_df[max_lag-lag_num:-lag_num]
+                                site_df[slag_name] = slag_df
+
+                        elif cat_lag[0] == 'continuous':
+                            for lag_idx in range(1, lag_num + 1):
+                                slag_name = cat_key + f's{lag_idx}'
+                                slag_df = single_site_df[max_lag-lag_idx:-lag_idx]
+                                site_df[slag_name] = slag_df
+                # print(f'site_df:\n{site_df}')
+                site_df[site_df<EPSILON] = 0.0
+                labels = [f'{col}' for col in site_df.columns]
+                for function_name in function_names:
+                    function_year_save_dir = year_save_dir + f'{function_name}/'
+                    save_name = f'{site}_single{year}_{season}.dot'
+                    try:
+                        causal_discovery(site_df, labels, function_year_save_dir, save_name, [function_name])
+                    except:
+                        print("R ERROR!")
 
 def compute_transfer_entropy_single_site_different_cats(combine_metro_and_nc_hdf_save_dir, combine_metro_and_nc_hdf_save_name, save_dir, save_name, site_list, year_list, pollutant_list, metro_list, stat_name = 'stat', args=None, freq='h', lag_range=range(1,9), season_list=None):
     def generate_causal_df_perkey_peryear(first_lag_index, first_df, second_df, freq, lag_range):
@@ -433,20 +493,115 @@ def discover_sypi(hdf_dir, hdf_name, save_dir, save_name, site_list, pollutant_l
     with open(save_path, 'w') as fp:
         json.dump(site_cause_dic, fp)
 
+def discover_pairwise_anm(hdf_dir, hdf_name, save_dir, save_name, site_list, pollutant_list, metro_list, year_list, stat_name='stat', freq='h', season_list=None):
+    print(f'pollutant_list:{pollutant_list}')
+    print(f'freq:{freq}')
+    df_dic = {}
+    site_pairwise_df_dic = {}
+    hdf_path = hdf_dir + hdf_name
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    
+    store = pd.HDFStore(hdf_path)
+    cat_keys = store.keys()
+    stat_df = store.get(stat_name)
+    for cat_key in cat_keys:
+        if cat_key[0] == '/':
+            cat_key = cat_key[1:]
+        if (not cat_key in metro_list) and (not cat_key in pollutant_list):
+            continue
+        cat_df = store.get(cat_key)
+        cat_df.loc[:, site_list] = utils.restrain_df_by_stat(cat_df[site_list], stat_df, cat_key)
+
+        if freq == 'd' or freq == 'D':
+            cat_df = utils.average_df_by_month(cat_df)
+        df_dic[cat_key] = cat_df
+    store.close()
+    discover_pairwise_df = pd.DataFrame(columns=['cause', 'effect'])
+    #cause -> effect
+    for site in site_list:
+        site_pairwise_df_dic[site] = discover_pairwise_df.copy()
+        
+    # for first_key in pollutant_list:
+    for first_key in pollutant_list+ metro_list:
+        for second_key in pollutant_list:
+            if args.single_pollute:
+                second_key = pollutant_list[args.pollute_idx]
+                print(f'********pollutant select ON********')
+                print(f'pollute_idx:{args.pollute_idx}')
+            else:
+                print(f'********pollutant select OFF********')
+            causal_key = first_key + "2" + second_key
+            print(f'causal_key:{causal_key}')
+
+            total_first_df = df_dic[first_key]
+            total_second_df = df_dic[second_key]
+            for year in year_list:
+                if season_list is not None:
+                    for season in season_list:
+                        if freq == 'h' or freq == 'H':
+                            pass
+                        elif freq == 'd' or freq == 'D':
+                            pass
+                        season_year_first_df = utils.get_season_df(total_first_df, season, year)
+                        season_year_second_df = utils.get_season_df(total_second_df, season, year)
+                        season_year_causal_key = causal_key+f'_{year}_{season}'
+                        for site in site_list:
+                            site_df = site_pairwise_df_dic[site]
+                            append_df = pd.DataFrame({'cause':[season_year_first_df[site].values], 'effect':[season_year_second_df[site].values]}, index=[season_year_causal_key])
+                            site_df = pd.concat([site_df, append_df], axis=0)
+                            site_pairwise_df_dic[site] = site_df
+            if args.single_pollute:
+                break
+    for site, site_df in tqdm(site_pairwise_df_dic.items()):
+        # print(f'site:{site}, site_df:\n{site_df}')
+        site_columns = site_df.index
+        site_save_name = save_name.split('.json')[0] + f'_{site}.json'
+        for i, site_column in enumerate(site_columns):
+            sub_label = [site_column]
+            sub_site_df = site_df.loc[sub_label, :]
+            # print(f'sub_site_df:{sub_site_df}\n, sub_label:{sub_label}')
+            pairwise_causal_discovery(sub_site_df, sub_label, save_dir, site_save_name, print_save_flag=not bool(i))
+        # pairwise_causal_discovery(site_df, site_columns, save_dir, site_save_name)
+
+
 def main(args):
     new_list_after_stlplus_2014_2020 = ['1292A', '1203A', '2280A', '2290A', '2997A', '1997A', '1295A', '2315A', '1169A', '1808A', '1226A', '1291A', '2275A', '2298A', '1154A', '2284A', '2271A', '2296A', '1229A', '1170A', '2316A', '2289A', '2007A', '1270A', '1262A', '1159A', '1204A', '2382A', '2285A', '1257A', '1241A', '1797A', '1252A', '1804A', '2342A', '1166A', '1271A', '2360A', '1290A', '1205A', '2312A', '1796A', '1210A', '2299A', '2288A', '2286A', '2314A', '2281A', '1265A', '1242A', '3002A', '1246A', '1167A', '2287A', '2423A', '2282A', '1221A', '2006A', '1171A', '2346A', '2294A', '1799A', '2311A', '3003A', '2001A', '2273A', '2301A', '2383A', '1256A', '2344A', '1145A', '1803A', '1266A', '1147A', '1795A', '2308A', '2357A', '1144A', '1233A', '2000A', '1186A', '2345A', '1294A', '1806A', '1234A', '1298A', '1999A', '2309A', '2278A', '1213A', '2283A', '1264A', '1200A', '1153A', '1240A', '2279A', '2274A', '2306A', '2291A', '1223A', '1239A', '2317A', '2005A', '1212A', '1798A', '1165A', '1215A', '1218A', '2376A', '2379A', '1269A', '1142A', '1228A', '1155A', '2361A', '1149A', '2303A', '2277A', '2310A', '2297A', '2292A', '3004A', '2307A', '1192A', '1267A', '1253A', '2270A', '1196A', '2295A', '1160A', '1235A', '1268A', '1245A', '1794A', '1236A', '1211A', '2004A', '1255A', '1296A', '1232A']
     metro_pollutant_hdf_dir = f'/mnt/d/codes/downloads/datasets/国控站点/h5/'
     metro_pollutant_hdf_name = f'guokong2014_2020长三角140log_exclude3std_reshape2n01_withstlplus284545_sourceAndDiff_nc.h5'
     year_list = range(2016, 2021)
-    causal_result_save_dir = f'../pics/causal_result/'
-    nc_data_list = ['cc', 'q', 'crwc', 't', 'uv_speed', 'uv_dir']
-    causal_metro_list = ['cc', 'q', 't', 'uv_speed', 'uv_dir']
+    # nc_data_list = ['cc', 'q', 'crwc', 't', 'uv_speed', 'uv_dir']
+    nc_data_list = ['cc', 'q', 't', 'uv_speed', 'uv_dir']
     pollutant_list = ['CO', 'NO2', 'O3', 'PM10', 'PM2.5', 'SO2']
     causal_discovery_season_year_list = range(2017, 2021)
     combine_metro_and_nc_hdf_save_dir = f'/mnt/d/codes/downloads/datasets/国控站点/h5/'
     combine_metro_and_nc_hdf_save_name = f'guokong2014_2020长三角140log_exclude3std_reshape2n01_withstlplus284545_sourceAndDiff_nc.h5'
     season_year_list = range(2018, 2020)
     season_list = ['summer', 'winter']
+
+    causal_function_names = ['LiNGAM', 'PC', 'GES']
+    # causal_function_names = ['PC', 'GES']
+    causal_result_save_dir = f'../pics/causal_result/'
+    causal_result_day_save_dir = f'../pics/causal_result/day/'
+    causal_result_hour_save_dir = f'../pics/causal_result/hour/'
+    causal_day_lags = {
+        'cc':['single', 2],
+        'q':['single', 2],
+        't':['continuous', 4],
+        'uv_speed':['continuous', 2],
+        'uv_dir':['no_need', 4],
+        'CO':['continuous', 2],
+        'NO2':['continuous', 2],
+        'O3':['continuous', 2],
+        'PM10':['continuous', 2],
+        'PM2.5':['continuous', 2],
+        'SO2':['single', 2],
+    }
+    
+    causal_metro_list = ['cc', 'q', 't', 'uv_speed', 'uv_dir']
+    causal_day_freq = 'd'
+    causal_hour_freq = 'h'
+
     transfer_hdf_dir = f'/mnt/d/codes/downloads/datasets/国控站点/h5/'
     transfer_hdf_name = f'transfer_entropy2014_2020长三角{len(new_list_after_stlplus_2014_2020)}.h5'
     transfer_hdf_day_name = f'transfer_entropy2016_2020长三角{len(new_list_after_stlplus_2014_2020)}_day.h5'
@@ -470,11 +625,28 @@ def main(args):
     sypi_json_season_day_name = f'sypi_season_day.json'
     sypi_json_season_hour_name = f'sypi_season_hour.json'
 
+    pairwise_anm_day_freq = 'd'
+    pairwise_anm_hour_freq = 'h'
+    pairwise_anm_season_year_list = range(2017, 2020)
+    pairwise_anm_season_list = ['spring', 'summer','autumn',  'winter']
+    pairwise_anm_season_hour_list = ['spring', 'summer','autumn',  'winter']
+    pairwise_anm_day_save_dir = f'/mnt/d/codes/downloads/datasets/国控站点/jsons/pairwise_anm/day/'
+    pairwise_anm_hour_save_dir = f'/mnt/d/codes/downloads/datasets/国控站点/jsons/pairwise_anm/hour/'
+    pairwise_anm_json_season_day_name = f'pairwise_anm_season_day.json'
+    pairwise_anm_json_season_hour_name = f'pairwise_anm_season_hour.json'
+    
 
     # discover_with_cdt_dayaverage(metro_pollutant_hdf_dir, metro_pollutant_hdf_name, new_list_after_stlplus_2014_2020, year_list, causal_result_save_dir)
 
-    # discover_with_cdt_perhour_summer_and_winter(metro_pollutant_hdf_dir, metro_pollutant_hdf_name, new_list_after_stlplus_2014_2020, year_list, causal_result_save_dir)
-    discover_with_cdt_perhour_summer_and_winter(metro_pollutant_hdf_dir, metro_pollutant_hdf_name, pollutant_list, causal_metro_list, new_list_after_stlplus_2014_2020, causal_discovery_season_year_list, causal_result_save_dir)
+
+    #discover graph causal per year per day by season
+    # discover_graph_causal(metro_pollutant_hdf_dir, metro_pollutant_hdf_name, causal_result_day_save_dir, pollutant_list, causal_metro_list, new_list_after_stlplus_2014_2020, causal_discovery_season_year_list, causal_function_names, freq=causal_day_freq)
+
+    #discover graph causal per year per day by season with lags
+    discover_graph_causal(metro_pollutant_hdf_dir, metro_pollutant_hdf_name, causal_result_day_save_dir, pollutant_list, causal_metro_list, new_list_after_stlplus_2014_2020, causal_discovery_season_year_list, causal_function_names, freq=causal_day_freq, lags=causal_day_lags, target_lag_name='O3')
+
+    #discover graph causal per year per hour by season
+    # discover_graph_causal(metro_pollutant_hdf_dir, metro_pollutant_hdf_name, causal_result_hour_save_dir, pollutant_list, causal_metro_list, new_list_after_stlplus_2014_2020, causal_discovery_season_year_list, causal_function_names, freq=causal_hour_freq)
 
     # discover_with_cdt_perhour(metro_pollutant_hdf_dir, metro_pollutant_hdf_name, new_list_after_stlplus_2014_2020, year_list, causal_result_save_dir)
 
@@ -499,7 +671,11 @@ def main(args):
     #discover sypi, per year per hour per month by season
     # discover_sypi(combine_metro_and_nc_hdf_save_dir, combine_metro_and_nc_hdf_save_name, sypi_json_dir, sypi_json_season_hour_name, new_list_after_stlplus_2014_2020, pollutant_list, nc_data_list, lags=None, year_list=sypi_season_year_list, threshold1=sypi_threshold1, threshold2=sypi_threshold2, freq=sypi_hour_freq, season_list=sypi_season_list)
 
+    #discover pairwise, per year per day by season
+    # discover_pairwise_anm(combine_metro_and_nc_hdf_save_dir, combine_metro_and_nc_hdf_save_name, pairwise_anm_day_save_dir, pairwise_anm_json_season_day_name, new_list_after_stlplus_2014_2020, pollutant_list, causal_metro_list, pairwise_anm_season_year_list, freq=pairwise_anm_day_freq, season_list=pairwise_anm_season_list)
 
+    # discover pairwise, per year per hour by season
+    # discover_pairwise_anm(combine_metro_and_nc_hdf_save_dir, combine_metro_and_nc_hdf_save_name, pairwise_anm_hour_save_dir, pairwise_anm_json_season_hour_name, new_list_after_stlplus_2014_2020, pollutant_list, causal_metro_list, pairwise_anm_season_year_list, freq=pairwise_anm_hour_freq, season_list=pairwise_anm_season_hour_list)
     # SyPI.foo()
 
 if __name__ == '__main__':
