@@ -20,11 +20,6 @@ def arg_parser():
     args = parser.parse_args()
     return args
 
-def find_nearest_idx(ar, value):
-    ar = np.asarray(ar)
-    idx = (np.abs(ar-value)).argmin()
-    # print(f'ar:{ar}\nvalue:{value}, idx:{idx}')
-    return idx
 
 def convert_list2txt(site_list, save_dir, save_name):
     save_path = save_dir + save_name
@@ -116,8 +111,8 @@ def generate_nc2site_hdf(nc_dir, nc_name, lon_index, lat_index, site_path, site_
         site_sr = df_site[df_site['监测点编码']==site]
         site_lon = site_sr['经度'].values[0]
         site_lat = site_sr['纬度'].values[0]
-        closest_lat_idx = find_nearest_idx(lat, site_lat)
-        closest_lon_idx = find_nearest_idx(lon, site_lon)
+        closest_lat_idx = utils.find_nearest_idx(lat, site_lat)
+        closest_lon_idx = utils.find_nearest_idx(lon, site_lon)
         for nc_data_cat in nc_data_list:
             df = nc_data_df_dic[nc_data_cat]
             nc_data = nc_data_dic[nc_data_cat]

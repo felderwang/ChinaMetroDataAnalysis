@@ -8,12 +8,15 @@ import graphviz
 import networkx as nx 
 from cdt.causality.graph import LiNGAM, PC, GES
 from cdt.causality.pairwise import ANM
-
+import lingam
+from lingam.utils import make_dot
 import utils
 import os
 import SyPI
 import argparse
 import copent
+import netCDF4
+import pydot
 from tqdm import tqdm
 import json
 
@@ -47,29 +50,40 @@ def str_to_dot(string):
     return graph
 
 def causal_discovery(df, labels, save_dir, save_name, function_names=['LiNGAM']):
-    total_functions = {
-            'LiNGAM' : LiNGAM,
-            'PC' : PC,
-            'GES' : GES,
-        }
-    functions = {}
-    for function_name in function_names:
-        functions[function_name] = total_functions[function_name]
-    # functions = {
-        # 'LiNGAM' : LiNGAM,
-    # }
-    for method, lib in functions.items():
-        obj = lib()
-        output = obj.predict(df)
-        adj_matrix = nx.to_numpy_matrix(output)
-        adj_matrix = np.asarray(adj_matrix)
+    cdt_causal_functions = {
+        'LiNGAM' : LiNGAM,
+        'PC' : PC,
+        'GES' : GES,
+    }
+    lingam_causal_functions = {
+        'lingamBupl':lingam.BottomUpParceLiNGAM,
+        'lingamDirLiNGAM':lingam.DirectLiNGAM,
+    }
+    for method in function_names:
+        if method in cdt_causal_functions.keys():
+            model = cdt_causal_functions[method]()
+            output = model.predict(df)
+            adj_matrix = nx.to_numpy_matrix(output)
+            adj_matrix = np.asarray(adj_matrix)
+            
+        elif method in lingam_causal_functions.keys():
+            # print(f'df max:{df.max()}, min:{df.min()}')
+            EPSILON = 1e-3
+            df[df<EPSILON] = EPSILON
+            # print(f'df max:{df.max()}, min:{df.min()}')
+            # print(f'df:\n{df}')
+            model = lingam_causal_functions[method]()
+            model.fit(df)
+            adj_matrix = model.adjacency_matrix_
+        else:
+            continue
+
         graph_dot = make_graph(adj_matrix, labels)
         local_save_name = save_name.split('.dot')[0]+f'_{method}.dot'
         local_save_path = save_dir + local_save_name
         print(f'Method: {method}, save to:{local_save_path}')
 
         graph_dot.render(format='png', filename=local_save_path)
-    
         # filename = graph.render(format='png', filename=save_dir+save_name)
 
 def pairwise_causal_discovery(df, labels, save_dir, save_name, print_save_flag=True):
@@ -190,6 +204,7 @@ def discover_graph_causal(hdf_dir, hdf_name, save_dir, pollutant_list, metro_lis
     target_lag_name is a cat. For example, if target_lag_name=='O3', then set lags['O3'] lag_state to 'no_need'
     '''
     print(f'freq:{freq}')
+    print(f'function_names:{function_names}')
     EPSILON = 1e-8
     hdf_path = hdf_dir + hdf_name
     store = pd.HDFStore(hdf_path)
@@ -564,9 +579,100 @@ def discover_pairwise_anm(hdf_dir, hdf_name, save_dir, save_name, site_list, pol
             pairwise_causal_discovery(sub_site_df, sub_label, save_dir, site_save_name, print_save_flag=not bool(i))
         # pairwise_causal_discovery(site_df, site_columns, save_dir, site_save_name)
 
+def merge_site_graph_causal_result_by_latlongrid(source_dir, save_dir, site_list, year_list, function_names, season_list, site_info_path, canonical_nc_path, merge_methods=['max', 'all', 'mean']):
+    def merge_dots(source_path_list, source_site_list, source_colors, merge_method = 'max'):
+        #default merge method: max
+        # print(f'save_dir:{save_dir}, save_name:{save_name}')
+        # print(f'source_path_list:{source_path_list}\nsource_site_list:{source_site_list}, source_colors:{source_colors}')
+        merged_d = graphviz.Digraph(engine='dot')
+        node_dict = {}
+        edge_dict = {}
+        for source_site, source_path, source_color in zip(source_site_list, source_path_list, source_colors):
+            gs = pydot.graph_from_dot_file(source_path)
+            g = gs[0]
+            nx_graph = nx.drawing.nx_pydot.from_pydot(g)
+            node_dict[source_site] = source_color
+            for n, nbrsdict in nx_graph.adjacency():
+                node_dict[n] = '#000000'
+                for nbr, keydict in nbrsdict.items():
+                    keydict = keydict[0]
+                    keydict_keys = keydict.keys()
+                    label = 0.0
+                    if 'label' in keydict_keys:
+                        label = float(keydict['label'])
+                    edge_key = (n, nbr)
+                    if not edge_key in edge_dict.keys():
+                        edge_dict[edge_key] = [(label, source_color)]
+                    else:
+                        edge_temp = edge_dict[edge_key]
+                        edge_temp.append((label, source_color))
+                        edge_dict[edge_key] = edge_temp
+
+        for node, node_attr in node_dict.items():
+            merged_d.node(node, color=node_attr)
+
+        for edge, edge_attrs in edge_dict.items():
+            if merge_method == 'average' or merge_method == 'mean':
+                label_sum = 0.0
+                for edge_attr in edge_attrs:
+                    label_sum += edge_attr[0]
+                label_sum /= len(edge_attrs)
+                merged_d.edge(edge[0], edge[1], label=str(label_sum))
+
+            elif merge_method == 'all':
+                for edge_attr in edge_attrs:
+                    merged_d.edge(edge[0], edge[1], label=str(edge_attr[0]), color=edge_attr[1])
+
+            else:
+                label_max = -np.inf
+                edge_color = '#000000'
+                for edge_attr in edge_attrs:
+                    edge_label = edge_attr[0]
+                    if edge_label > label_max:
+                        label_max = edge_label
+                        edge_color = edge_attr[1]
+                merged_d.edge(edge[0], edge[1], label=str(label_max), color=edge_color)
+
+        return merged_d
+
+    cmap = plt.get_cmap('gnuplot')
+
+    site_cluster = utils.get_site_cluster(site_list, site_info_path, canonical_nc_path)
+    for year in year_list:
+        year_source_dir = source_dir + f'season_uv/{year}/'
+        year_save_dir = save_dir + f'season_uv/{year}/'
+        for method in function_names:
+            year_method_source_dir = year_source_dir + f'{method}/'
+            year_method_save_dir = year_save_dir + f'{method}/merge_site_cluster_same_grid/'
+            if not os.path.exists(year_method_save_dir):
+                os.makedirs(year_method_save_dir)
+            for season in season_list:
+                sc_save_dir = year_method_save_dir
+                for sc_key, sc in site_cluster.items():
+                    source_path_list = []
+                    sc_list = sc[0]
+                    sc_name = ""
+                    for single_site in sc_list:
+                        sc_name += f'{single_site}_'
+                        source_path = year_method_source_dir + f'{single_site}_single{year}_{season}_{method}.dot'
+                        source_path_list.append(source_path)
+                    
+                    sc_name += f'single{year}_{season}_{method}.dot'
+                    source_colors = [utils.convert_cmap_color2rgb(cmap(i)[:3]) for i in np.linspace(0, 0.5, len(sc_list))]
+                    for merge_method in merge_methods:
+                        merge_sc_save_dir = sc_save_dir + f'{merge_method}/'
+                        merge_sc_name = sc_name.split('.dot')[0] + f'{merge_method}.dot'
+                        merged_d = merge_dots(source_path_list, sc_list, source_colors, merge_method=merge_method)
+                        sc_save_path = merge_sc_save_dir + merge_sc_name
+                        print(f'Save to: {sc_save_path}')
+                        merged_d.render(format='png', filename=sc_save_path)
+            
 
 def main(args):
     new_list_after_stlplus_2014_2020 = ['1292A', '1203A', '2280A', '2290A', '2997A', '1997A', '1295A', '2315A', '1169A', '1808A', '1226A', '1291A', '2275A', '2298A', '1154A', '2284A', '2271A', '2296A', '1229A', '1170A', '2316A', '2289A', '2007A', '1270A', '1262A', '1159A', '1204A', '2382A', '2285A', '1257A', '1241A', '1797A', '1252A', '1804A', '2342A', '1166A', '1271A', '2360A', '1290A', '1205A', '2312A', '1796A', '1210A', '2299A', '2288A', '2286A', '2314A', '2281A', '1265A', '1242A', '3002A', '1246A', '1167A', '2287A', '2423A', '2282A', '1221A', '2006A', '1171A', '2346A', '2294A', '1799A', '2311A', '3003A', '2001A', '2273A', '2301A', '2383A', '1256A', '2344A', '1145A', '1803A', '1266A', '1147A', '1795A', '2308A', '2357A', '1144A', '1233A', '2000A', '1186A', '2345A', '1294A', '1806A', '1234A', '1298A', '1999A', '2309A', '2278A', '1213A', '2283A', '1264A', '1200A', '1153A', '1240A', '2279A', '2274A', '2306A', '2291A', '1223A', '1239A', '2317A', '2005A', '1212A', '1798A', '1165A', '1215A', '1218A', '2376A', '2379A', '1269A', '1142A', '1228A', '1155A', '2361A', '1149A', '2303A', '2277A', '2310A', '2297A', '2292A', '3004A', '2307A', '1192A', '1267A', '1253A', '2270A', '1196A', '2295A', '1160A', '1235A', '1268A', '1245A', '1794A', '1236A', '1211A', '2004A', '1255A', '1296A', '1232A']
+
+    site_info_path = '/mnt/d/codes/downloads/datasets/国控站点/_站点列表/站点列表-2021.01.01起.xlsx'
+    canonical_nc_path = '../datas/netcdf/guokong176year2020.nc'
     metro_pollutant_hdf_dir = f'/mnt/d/codes/downloads/datasets/国控站点/h5/'
     metro_pollutant_hdf_name = f'guokong2014_2020长三角140log_exclude3std_reshape2n01_withstlplus284545_sourceAndDiff_nc.h5'
     year_list = range(2016, 2021)
@@ -580,10 +686,14 @@ def main(args):
     season_list = ['summer', 'winter']
 
     causal_function_names = ['LiNGAM', 'PC', 'GES']
+    lingam_causal_function_names = ['lingamBupl']
+    aa_causal_funciton_names = ['lingamBupl', 'lingamDirLiNGAM', 'LiNGAM', 'PC', 'GES']
     # causal_function_names = ['PC', 'GES']
+    causal_season_list = ['spring', 'summer','autumn',  'winter']
     causal_result_save_dir = f'../pics/causal_result/'
     causal_result_day_save_dir = f'../pics/causal_result/day/'
     causal_result_hour_save_dir = f'../pics/causal_result/hour/'
+    causal_result_day_merge_save_dir = f'../pics/causal_result/day/'
     causal_day_lags = {
         'cc':['single', 2],
         'q':['single', 2],
@@ -634,6 +744,8 @@ def main(args):
     pairwise_anm_hour_save_dir = f'/mnt/d/codes/downloads/datasets/国控站点/jsons/pairwise_anm/hour/'
     pairwise_anm_json_season_day_name = f'pairwise_anm_season_day.json'
     pairwise_anm_json_season_hour_name = f'pairwise_anm_season_hour.json'
+
+    nc_path = f'/mnt/d/codes/little programs/国控站点数据处理/datas/netcdf/guokong176year2020.nc'
     
 
     # discover_with_cdt_dayaverage(metro_pollutant_hdf_dir, metro_pollutant_hdf_name, new_list_after_stlplus_2014_2020, year_list, causal_result_save_dir)
@@ -642,11 +754,17 @@ def main(args):
     #discover graph causal per year per day by season
     # discover_graph_causal(metro_pollutant_hdf_dir, metro_pollutant_hdf_name, causal_result_day_save_dir, pollutant_list, causal_metro_list, new_list_after_stlplus_2014_2020, causal_discovery_season_year_list, causal_function_names, freq=causal_day_freq)
 
-    #discover graph causal per year per day by season with lags
-    discover_graph_causal(metro_pollutant_hdf_dir, metro_pollutant_hdf_name, causal_result_day_save_dir, pollutant_list, causal_metro_list, new_list_after_stlplus_2014_2020, causal_discovery_season_year_list, causal_function_names, freq=causal_day_freq, lags=causal_day_lags, target_lag_name='O3')
-
     #discover graph causal per year per hour by season
     # discover_graph_causal(metro_pollutant_hdf_dir, metro_pollutant_hdf_name, causal_result_hour_save_dir, pollutant_list, causal_metro_list, new_list_after_stlplus_2014_2020, causal_discovery_season_year_list, causal_function_names, freq=causal_hour_freq)
+
+    #discover graph causal per year per day by season, by lingam
+    # discover_graph_causal(metro_pollutant_hdf_dir, metro_pollutant_hdf_name, causal_result_day_save_dir, pollutant_list, causal_metro_list, new_list_after_stlplus_2014_2020, causal_discovery_season_year_list, aa_causal_funciton_names, freq=causal_day_freq)
+
+    #discover graph causal per year per hour by season, by lingam
+    # discover_graph_causal(metro_pollutant_hdf_dir, metro_pollutant_hdf_name, causal_result_hour_save_dir, pollutant_list, causal_metro_list, new_list_after_stlplus_2014_2020, causal_discovery_season_year_list, lingam_causal_function_names, freq=causal_hour_freq)
+
+    #discover graph causal per year per day by season with lags
+    # discover_graph_causal(metro_pollutant_hdf_dir, metro_pollutant_hdf_name, causal_result_day_save_dir, pollutant_list, causal_metro_list, new_list_after_stlplus_2014_2020, causal_discovery_season_year_list, causal_function_names, freq=causal_day_freq, lags=causal_day_lags, target_lag_name='O3')
 
     # discover_with_cdt_perhour(metro_pollutant_hdf_dir, metro_pollutant_hdf_name, new_list_after_stlplus_2014_2020, year_list, causal_result_save_dir)
 
@@ -677,7 +795,8 @@ def main(args):
     # discover pairwise, per year per hour by season
     # discover_pairwise_anm(combine_metro_and_nc_hdf_save_dir, combine_metro_and_nc_hdf_save_name, pairwise_anm_hour_save_dir, pairwise_anm_json_season_hour_name, new_list_after_stlplus_2014_2020, pollutant_list, causal_metro_list, pairwise_anm_season_year_list, freq=pairwise_anm_hour_freq, season_list=pairwise_anm_season_hour_list)
     # SyPI.foo()
-
+    
+    merge_site_graph_causal_result_by_latlongrid(causal_result_day_save_dir, causal_result_day_merge_save_dir, new_list_after_stlplus_2014_2020, causal_discovery_season_year_list, aa_causal_funciton_names, causal_season_list, site_info_path, canonical_nc_path)
 if __name__ == '__main__':
     args = arg_parser()
     main(args)

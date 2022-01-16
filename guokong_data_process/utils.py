@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 import argparse
+import netCDF4
 
 def save_hdf2file(df, key, save_path, save_dir=None):
     if not save_dir is None:
@@ -109,3 +110,56 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
+
+def get_nc_lat_lon(nc_path):
+    nc_obj = netCDF4.Dataset(nc_path)
+    keys = nc_obj.variables.keys()
+    lat = None
+    lon = None
+    for key in list(keys):
+        if key == 'longitude':
+            lon = np.array(nc_obj.variables[key][:])
+        elif key == 'latitude':
+            lat = np.array(nc_obj.variables[key][:])
+    return lat, lon
+
+
+def find_nearest_idx(ar, value):
+    ar = np.asarray(ar)
+    idx = (np.abs(ar-value)).argmin()
+    return idx
+
+def get_site_cluster(site_list, site_info_path, canonical_nc_path):
+    '''
+    Returns site_cluster:{
+        key:(closest_lat_idx, closest_lon_idx),
+        item:[[site_list], (closest_lat, closest_lon)]
+    }
+    '''
+    site_df = pd.read_excel(site_info_path)
+    lat, lon = get_nc_lat_lon(canonical_nc_path)
+    site_cluster = {}
+    for site in site_list:
+        site_sr = site_df[site_df['监测点编码']==site]
+        site_lat = site_sr['纬度'].values[0]
+        site_lon = site_sr['经度'].values[0]
+
+        closest_lat_idx = find_nearest_idx(lat, site_lat)
+        closest_lon_idx = find_nearest_idx(lon, site_lon)
+        site_cluster_key = (closest_lat_idx, closest_lon_idx)
+        closest_lat = lat[closest_lat_idx]
+        closest_lon = lon[closest_lon_idx]
+        relate_latlon = (closest_lat, closest_lon)
+        if not site_cluster_key in site_cluster.keys():
+            site_cluster[site_cluster_key] = [[site], relate_latlon]
+        else:
+            site_temp = site_cluster[site_cluster_key]
+            site_temp[0].append(site)
+            site_cluster[site_cluster_key] = site_temp
+    return site_cluster
+
+def convert_cmap_color2rgb(cmap_color):
+    ret_rgb = '#'
+    for cc in cmap_color:
+        ret_rgb += '{:02x}'.format(int(cc*255))
+    return ret_rgb
